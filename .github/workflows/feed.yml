@@ -1,0 +1,33 @@
+name: Build Beerizer feed
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Download feed pages
+        run: |
+          mkdir site
+          for p in 1 2 3 4 5 6 7 8; do
+            curl -fsSL -A "Mozilla/5.0" "https://gravity.shop/collections/sor?view=beerizer&page=$p" >> all.csv || true
+          done
+          tr -d '\r' < all.csv | awk 'NF && !seen[$0]++' > site/beerizer.csv
+          test $(wc -l < site/beerizer.csv) -gt 10
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
