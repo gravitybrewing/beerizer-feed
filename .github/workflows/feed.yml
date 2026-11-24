@@ -1,8 +1,8 @@
 name: Build Beerizer feed
 on:
   schedule:
-    - cron: '*/30 * * * *'
-  workflow_dispatch:
+    - cron: '7,37 * * * *'
+    workflow_dispatch:
 permissions:
   contents: read
   pages: write
