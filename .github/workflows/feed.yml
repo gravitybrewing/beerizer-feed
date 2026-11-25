@@ -4,30 +4,33 @@ on:
     - cron: '7,37 * * * *'
   workflow_dispatch:
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 concurrency:
-  group: pages
+  group: feed
   cancel-in-progress: false
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
       - name: Download feed pages
         run: |
-          mkdir site
+          old=$(wc -l < beerizer.csv 2>/dev/null || echo 0)
+          rm -f all.csv
           for p in 1 2 3 4 5 6 7 8; do
-            curl -fsSL -A "Mozilla/5.0" "https://gravity.shop/collections/sor?view=beerizer&page=$p" >> all.csv || true
+            curl -fsS --retry 5 --retry-all-errors --retry-delay 10 -A "Mozilla/5.0" "https://gravity.shop/collections/sor?view=beerizer&page=$p" >> all.csv || true
           done
-          tr -d '\r' < all.csv | awk 'NF && !seen[$0]++' > site/beerizer.csv
-          test $(wc -l < site/beerizer.csv) -gt 10
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          tr -d '\r' < all.csv | awk 'NF && !seen[$0]++' > new.csv
+          new=$(wc -l < new.csv)
+          echo "old=$old new=$new"
+          test "$new" -gt 50
+          test "$new" -ge $((old * 9 / 10))
+          mv new.csv beerizer.csv
+          rm -f all.csv
+      - name: Save feed
+        run: |
+          git config user.name "feed-bot"
+          git config user.email "feed-bot@users.noreply.github.com"
+          git add beerizer.csv
+          git diff --cached --quiet || git commit -m "Update feed"
+          git push
